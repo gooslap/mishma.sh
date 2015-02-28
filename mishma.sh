@@ -22,37 +22,34 @@ _mshmsh_chr_replace()
 
 _mshmsh_get()
 {
-    # Gets a value from the variable named var (simulating pass-by-reference).
-    local var="$1"
-    local statement="\${$var}"
+    local __mshmash_var_ref="$1"
+    local statement="\${$__mshmash_var_ref}"
 
-    if _mshmsh_isset "$var"; then
+    if _mshmsh_isset "$__mshmash_var_ref"; then
 
         eval "printf '%s\n' \"$statement\"" 
 
         if (( $? != 0 )); then
             _mshmsh_error \
-                "$(printf \
-                    'Get variable "%s" using statement "%s" failed.'\
-                    "$var" "$statement")"
+                "$(printf 'Get variable "%s" failed.' "$__mshmash_var_ref")"
         fi
     else
-        _mshmsh_error "$(printf 'Variable "%s" is null.' "$var")"
+        _mshmsh_error "$(printf 'Variable "%s" is null.' "$__mshmash_var_ref")"
     fi
 }
 
 _mshmsh_isset()
 {
-    local var="$1"
-    [[ -n ${var+x} ]]
+    local __mshmash_var_ref="$1"
+    [[ -n ${__mshmash_var_ref+x} ]]
 }
 
 _mshmsh_set()
 {
     # Sets a variable equal to a value (simulating pass-by-reference).
-    local __mshmash_ref_var="$1"
-    local val="$2"
-    local statement="$__mshmash_ref_var='$val'"
+    local __mshmash_var_ref="$1"
+    local __mshmash_new_val="$2"
+    local statement="$__mshmash_var_ref='$__mshmash_new_val'"
 
     eval "$statement" 
 
@@ -60,15 +57,17 @@ _mshmsh_set()
         _mshmsh_error \
             "$(printf \
                 'Set variable "%s" with statment "%s" failed.'\
-                "$var" "$statement")"
+                "$__mshmash_var_ref" "$statement")"
     fi
 }
 
 _mshmsh_dict_from_func_args()
 {
-    # Extract all space-separated [var]="value" pairs
-    local var="$1"
-    local string="$2"
+    # Extract all space-separated [var]="value" pairs and inserts into
+    # dict.
+    local dict_ref="$1"
+    local args_ref="$2"
+    local newargs=
 }
 
 _mshmsh_parse_args()

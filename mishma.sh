@@ -38,15 +38,32 @@ _mshmsh_get()
     fi
 }
 
+_mshmsh_getd()
+{
+    local __mshmash_var_ref="$1"
+    local statement="\${$__mshmash_var_ref[*]}"
+
+    if _mshmsh_isset "$__mshmash_var_ref"; then
+
+        eval "printf '%s\n' \"$statement\"" 
+
+        if (( $? != 0 )); then
+            _mshmsh_error \
+                "$(printf 'Get variable "%s" failed.' "$__mshmash_var_ref")"
+        fi
+    else
+        _mshmsh_error "$(printf 'Variable "%s" is null.' "$__mshmash_var_ref")"
+    fi
+}
+
 _mshmsh_isset()
 {
     local __mshmash_var_ref="$1"
-    [[ -n ${__mshmash_var_ref+x} ]]
+    eval "[[ -n \${$__mshmash_var_ref+x} ]]"
 }
 
 _mshmsh_set()
 {
-    # Sets a variable equal to a value (simulating pass-by-reference).
     local __mshmash_var_ref="$1"
     local __mshmash_new_val="$2"
     local statement="$__mshmash_var_ref='$__mshmash_new_val'"
@@ -61,13 +78,38 @@ _mshmsh_set()
     fi
 }
 
-_mshmsh_dict_from_func_args()
+_mshmsh_setd()
 {
-    # Extract all space-separated [var]="value" pairs and inserts into
+    local __mshmash_var_ref="$1"
+    shift
+    local __mshmash_new_val="$*"
+    local statement="$__mshmash_var_ref=($__mshmash_new_val)"
+
+    if _mshmsh_isset "$__mshmash_var_ref"; then
+        eval "$statement" 
+
+        if (( $? != 0 )); then
+            _mshmsh_error \
+                "$(printf \
+                    'Set dictionary "%s" with statment "%s" failed.'\
+                    "$__mshmash_var_ref" "$statement")"
+        fi
+    else
+        _mshmsh_error \
+            "$(printf \
+                '"declare -A %s" must be called before setting the dictionary.' \
+                "$__mshmash_var_ref")"
+    fi
+}
+
+_mshmsh_extract_dict_from_func_args()
+{
+    # Extract all space-separated [var]="value" pairs and insert into
     # dict.
     local dict_ref="$1"
     local args_ref="$2"
-    local newargs=
+
+
 }
 
 _mshmsh_parse_args()
@@ -119,7 +161,6 @@ _mshmsh_eval()
     local args="$@"
     local result=
 
-    # This will not work for assignments
     result="$(eval "$args" 2>&1)"
     if (( $? != 0 )); then
         _mshmsh_error \
@@ -150,9 +191,17 @@ _()
             shift
             _mshmsh_get "$@"
             ;;
+        getd)
+            shift
+            _mshmsh_getd "$@"
+            ;;
         set)
             shift
             _mshmsh_set "$@"
+            ;;
+        setd)
+            shift
+            _mshmsh_setd "$@"
             ;;
         isset)
             shift

@@ -5,6 +5,7 @@ _mshmsh_chr_replace()
     local oldchar="$2"
     local newchar="$3"
     local result=
+
     for (( i=0; i < ${#string}; i++ )); do
         if [[ "${string:$i:1}" == "$oldchar" ]]; then
             result+="$newchar" 
@@ -13,6 +14,36 @@ _mshmsh_chr_replace()
         fi
     done
     printf '%s' "$result"
+}
+
+_mshmsh_chr_escape()
+{
+    local string="$1"
+    local char="$2"
+    local escape_char="\\"
+    local result=
+
+    for (( i=0; i < ${#string}; i++ )); do
+        if [[ "${string:$i:1}" == "$char" ]]; then
+            result+="${escape_char}${char}" 
+        else
+            result+="${string:$i:1}"
+        fi
+    done
+    printf '%s' "$result"
+}
+
+_mshmsh_contains_char()
+{
+    local string="$1"
+    local char="$2"
+
+    for (( i=0; i < ${#string}; i++ )); do
+        if [[ "${string:$i:1}" == "$char" ]]; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 _mshmsh_get()
@@ -37,7 +68,8 @@ _mshmsh_set()
 {
     local __mshmash_var_ref="$1"
     local __mshmash_new_val="$2"
-    local statement="$__mshmash_var_ref='$__mshmash_new_val'"
+    __mshmash_new_val="$(_mshmsh_chr_escape "$__mshmash_new_val" \")"
+    local statement="$__mshmash_var_ref=\"$__mshmash_new_val\""
 
     eval "$statement" 
 
@@ -78,7 +110,6 @@ _mshmsh_parse_args()
     local lhs=
     local rhs=
 
-    # Parse the actual arguments, comparing them against the expected arguments.
     while (( $# )); do
         lhs="${1%%=*}"
         rhs="${1##*=}"
@@ -88,7 +119,8 @@ _mshmsh_parse_args()
         else
             _mshmsh_error "$(printf 'Invalid argument "%s" must have "--" prefix.' "$1")"
         fi
-        lhs="$(_mshmsh_chr_replace "$lhs" '-' '_')"
+
+        lhs="$(_mshmsh_chr_replace "$lhs" - _)"
 
         _mshmsh_set "$lhs" "$rhs"
 
@@ -117,7 +149,7 @@ _mshmsh_error()
     local context="$1"
     printf 'Error: %s\n\nTraceback (most recent call first):\n' "$context"
     # Starting from 1 removes _mshmsh_error() from the stack trace.
-    for (( i=1; i < ${#BASH_LINENO[@]}; i++ )); do
+    for (( i=0; i < ${#BASH_LINENO[@]}; i++ )); do
         printf '    File "%s, line %i, in %s()\n' \
             ${BASH_SOURCE[$i]} ${BASH_LINENO[$i]} ${FUNCNAME[$i]}
     done
@@ -147,6 +179,10 @@ _()
             shift
             _mshmsh_chr_replace "$@"
             ;;
+        chr_escape)
+            shift
+            _mshmsh_chr_escape "$@"
+            ;;
         error)
             shift
             _mshmsh_error "$@"
@@ -157,5 +193,6 @@ _()
             ;;
         *)
             _mshmsh_call "$@"
+            ;;
     esac
 }

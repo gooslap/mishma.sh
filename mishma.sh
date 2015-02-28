@@ -1,226 +1,173 @@
-# usage: source mishma.sh
 
-# Notes:
-#
-# - Create better error reporting/exception handling mechanism.
-#
-# - Create abstraction layer for variables (all variables should
-#   be maintained by mishma.sh).
-#
-# - List and Map types (bash already has arrays and dicts so
-#   expand upon this basis).
-#
-# - Make extensive use of function callback mechanism.
-#
-# - Add named arguments to functions via preamble.
-#
-#   e.g. f(){
-#           _ a, b, c
-#        }
-#
-#   Introspection in this case can be done using "declare -{f,F}"
+#func=([name]="blah" [is_mishmash_func]=1 [arg1]="blah" ... [argn]="blah")
 
-__mishmash_error()
+declare -a _MSHMSH_FUNC_TABLE
+
+
+_mshmsh_chr_replace()
 {
-    local msg="$*"
-    echo "error: $msg" 1>&2
-    echo "backtrace (most recent first):" 1>&2
-    local stacksize=${#FUNCNAME[@]}
-    for (( i=1; i < stacksize; i++ )); do
-        echo $i: ${BASH_SOURCE[$i]}, \
-                 ${FUNCNAME[$i]}, \
-                 line ${BASH_LINENO[$i-1]} 1>&2
+    local string="$1"
+    local oldchar="$2"
+    local newchar="$3"
+    local result=
+    for (( i=0; i < ${#string}; i++ )); do
+        if [[ "${string:$i:1}" == "$oldchar" ]]; then
+            result+="$newchar" 
+        else
+            result+="${string:$i:1}"
+        fi
+    done
+    printf '%s' "$result"
+}
+
+_mshmsh_get()
+{
+    # Gets a value from the variable named var (simulating pass-by-reference).
+    local var="$1"
+    local statement="\${$var}"
+
+    if _mshmsh_isset "$var"; then
+
+        eval "printf '%s\n' \"$statement\"" 
+
+        if (( $? != 0 )); then
+            _mshmsh_error \
+                "$(printf \
+                    'Get variable "%s" using statement "%s" failed.'\
+                    "$var" "$statement")"
+        fi
+    else
+        _mshmsh_error "$(printf 'Variable "%s" is null.' "$var")"
+    fi
+}
+
+_mshmsh_isset()
+{
+    local var="$1"
+    [[ -n ${var+x} ]]
+}
+
+_mshmsh_set()
+{
+    # Sets a variable equal to a value (simulating pass-by-reference).
+    local __mshmash_ref_var="$1"
+    local val="$2"
+    local statement="$__mshmash_ref_var='$val'"
+
+    eval "$statement" 
+
+    if (( $? != 0 )); then
+        _mshmsh_error \
+            "$(printf \
+                'Set variable "%s" with statment "%s" failed.'\
+                "$var" "$statement")"
+    fi
+}
+
+_mshmsh_dict_from_func_args()
+{
+    # Extract all space-separated [var]="value" pairs
+    local var="$1"
+    local string="$2"
+}
+
+_mshmsh_parse_args()
+{
+    set -x
+    local args="$@"
+    local expected_args=
+    local lhs=
+    local rhs=
+    local statment=
+    
+    # Grab all of the expected argument entries.
+    while (( $# )); do
+        if [[ "${1:0:1}" == "[" ]]; then
+            expected_args+="$1 "
+            shift
+            continue
+        else
+            # It is expected that actual arguments come after expected-list.
+            break
+        fi
+    done
+    set +x
+
+    # Establish expected argument list.
+    expected_args=($expected_args)
+
+    # Parse the actual arguments, comparing them against the expected arguments.
+    while (( $# )); do
+        lhs="${1%%=*}"
+        rhs="${1##*=}"
+        
+        if [[ "${lhs:0:2}" == "--" ]]; then
+            lhs="${lhs:2:${#lhs}}"
+        else
+            _mshmsh_error "$(printf 'Invalid argument "%s" must have "--" prefix.' "$1")"
+        fi
+        lhs="$(_mshmsh_chr_replace "$lhs" '-' '_')"
+
+        _mshmsh_set "$lhs" "$rhs"
+
+        shift
+
+    done
+}
+
+_mshmsh_eval()
+{
+    local args="$@"
+    local result=
+
+    # This will not work for assignments
+    result="$(eval "$args" 2>&1)"
+    if (( $? != 0 )); then
+        _mshmsh_error \
+            "$(printf \
+                'Execution of command "%s" failed. Output:\n\n"%s"'\
+                "$args" "$result")"
+    else
+        printf '%s\n' "$result"
+    fi
+}
+
+_mshmsh_error()
+{
+    local context="$1"
+    printf 'Error: %s\n\nTraceback (most recent call first):\n' "$context"
+    # Starting from 1 removes _mshmsh_error() from the stack trace.
+    for (( i=1; i < ${#BASH_LINENO[@]}; i++ )); do
+        printf '    File "%s, line %i, in %s()\n' \
+            ${BASH_SOURCE[$i]} ${BASH_LINENO[$i]} ${FUNCNAME[$i]}
     done
     exit 1
 }
 
-# get var [result]
-__mishmash_get()
-{
-    echo "not implemented"
-}
-
-# set var value [result]
-__mishmash_set()
-{
-    echo "not implemented"
-}
-
-# new type name [value]
-__mishmash_new()
-{
-    if (( $# < 2 )); then 
-        __mishmash_error "invalid call \"_ new $*\", expected \"_ new type name [value] [result]\"";
-    fi
-    local type="$1"
-    local name="$2"
-    local value="$3"
-
-    case $type in
-        int)
-            eval __mishmash_vars__$name=$(( value ))
-            eval "__mishmash_vars__${name}_type=int"
-            ;;
-
-        string)
-            eval __mishmash_vars__$name="$value"
-            eval "__mishmash_vars__${name}_type=string"
-            ;;
-
-        list)
-            shift 2
-            eval "__mishmash_vars__$name=($*)"
-            eval "__mishmash_vars__${name}_type=list"
-            ;;
-
-        dict)
-            shift 2
-            for keyvalpair in "$@"; do
-                # bash associative arrays are wonky so we need to create our own
-                # not that they will be any better
-                eval __mishmash_vars__${name}_${keyvalpair}
-                if (( $? != 0 )); then __mishmash_error "invalid $keyvalpair"; fi
-                eval "__mishmash_vars__${name}_type=dict"
-                eval "__mishmash_vars__${name}_length=$(( __mishmash_vars__${name}_length += 1 ))"
-            done
-            ;;
-
-        *)
-            __mishmash_error "invalid type \"$type\" specified, expected int|string|list|dict";
-            ;;
-
-    esac
-}
-
-__mishmash_del()
-{
-    echo "not implemented"
-}
-
 _()
 {
-    if (( $# < 1 )); then __mishmash_error "no command specified"; fi
-    local cmd="$1"
-    shift
-
-    # check if command exists then call it
-    if [[ $cmd == "get" ]]; then __mishmash_get "$@"; fi
-    if [[ $cmd == "set" ]]; then __mishmash_set "$@"; fi
-    if [[ $cmd == "new" ]]; then __mishmash_new "$@"; fi
-
-    # These are taken from underscore.js which seems like a
-    # reasonable starting point.
-
-    # Objects:
-    # new
-    # keys
-    # values
-    # pairs
-    # invert
-    # functions
-    # extend
-    # pick
-    # omit
-    # defaults
-    # clone
-    # tap
-    # has
-    # matches
-    # property
-    # is_equal
-    # is_empty
-    # is_element
-    # is_array
-    # is_object
-    # is_arguments
-    # is_function
-    # is_string
-    # is_number
-    # is_finite
-    # is_boolean
-    # is_date
-    # is_reg_exp
-    # is_nan
-    # is_undefined
-
-    # Collections:
-    # each
-    # map
-    # reduce
-    # filter_right
-    # find
-    # filter
-    # where
-    # findWhere
-    # reject
-    # every
-    # some
-    # contains
-    # invoke
-    # pluck
-    # max
-    # min
-    # sort_by
-    # group_by
-    # index_by
-    # count_by
-    # shuffle
-    # sample
-    # to_array
-
-    # Arrays:
-    # first
-    # initial
-    # last
-    # rest
-    # compact
-    # flatten
-    # without
-    # union
-    # intersection
-    # difference
-    # uniq
-    # zip
-    # object
-    # index_of
-    # last_index_of
-    # sorted_index
-    # range
-
-    # Functions:
-    # bind
-    # bind_all
-    # partial
-    # memoize
-    # delay
-    # defer
-    # throttle
-    # debounce
-    # once
-    # after
-    # before
-    # wrap
-    # negate
-    # compose
-
-    # Utility:
-    # no_conflict
-    # identity
-    # constant
-    # noop
-    # times
-    # random
-    # mixin
-    # iteratee
-    # unique_id
-    # escape
-    # unescape
-    # result
-    # now
-    # template
-
-    # Chaining:
-    # chain
-    # value
-
+    case "$1" in
+        get)
+            shift
+            _mshmsh_get "$@"
+            ;;
+        set)
+            shift
+            _mshmsh_set "$@"
+            ;;
+        isset)
+            shift
+            _mshmsh_isset "$@"
+            ;;
+        parse_args)
+            shift
+            _mshmsh_parse_args "$@"
+            ;;
+        repl)
+            shift
+            _mshmsh_chr_replace "$@"
+            ;;
+        *)
+            _mshmsh_eval "$@"
+    esac
 }

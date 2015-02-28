@@ -1,9 +1,4 @@
 
-#func=([name]="blah" [is_mishmash_func]=1 [arg1]="blah" ... [argn]="blah")
-
-declare -a _MSHMSH_FUNC_TABLE
-
-
 _mshmsh_chr_replace()
 {
     local string="$1"
@@ -38,30 +33,6 @@ _mshmsh_get()
     fi
 }
 
-_mshmsh_getd()
-{
-    local __mshmash_var_ref="$1"
-    local statement="\${$__mshmash_var_ref[*]}"
-
-    if _mshmsh_isset "$__mshmash_var_ref"; then
-
-        eval "printf '%s\n' \"$statement\"" 
-
-        if (( $? != 0 )); then
-            _mshmsh_error \
-                "$(printf 'Get variable "%s" failed.' "$__mshmash_var_ref")"
-        fi
-    else
-        _mshmsh_error "$(printf 'Variable "%s" is null.' "$__mshmash_var_ref")"
-    fi
-}
-
-_mshmsh_isset()
-{
-    local __mshmash_var_ref="$1"
-    eval "[[ -n \${$__mshmash_var_ref+x} ]]"
-}
-
 _mshmsh_set()
 {
     local __mshmash_var_ref="$1"
@@ -78,64 +49,34 @@ _mshmsh_set()
     fi
 }
 
-_mshmsh_setd()
+_mshmsh_isset()
 {
     local __mshmash_var_ref="$1"
-    shift
-    local __mshmash_new_val="$*"
-    local statement="$__mshmash_var_ref=($__mshmash_new_val)"
-
-    if _mshmsh_isset "$__mshmash_var_ref"; then
-        eval "$statement" 
-
-        if (( $? != 0 )); then
-            _mshmsh_error \
-                "$(printf \
-                    'Set dictionary "%s" with statment "%s" failed.'\
-                    "$__mshmash_var_ref" "$statement")"
-        fi
-    else
-        _mshmsh_error \
-            "$(printf \
-                '"declare -A %s" must be called before setting the dictionary.' \
-                "$__mshmash_var_ref")"
-    fi
+    eval "[[ -n \${$__mshmash_var_ref+x} ]]"
 }
 
-_mshmsh_extract_dict_from_func_args()
-{
-    # Extract all space-separated [var]="value" pairs and insert into
-    # dict.
-    local dict_ref="$1"
-    local args_ref="$2"
-
-
-}
+#_mshmsh_extract_expected_args()
+#{
+#    local expected_args=
+#    
+#    # Grab all of the expected argument entries.
+#    while (( $# )); do
+#        if [[ "${1:0:1}" == "[" ]]; then
+#            expected_args+="$1 "
+#            shift
+#            continue
+#        else
+#            # It is expected that actual arguments come after expected-list.
+#            break
+#        fi
+#    done
+#}
 
 _mshmsh_parse_args()
 {
-    set -x
     local args="$@"
-    local expected_args=
     local lhs=
     local rhs=
-    local statment=
-    
-    # Grab all of the expected argument entries.
-    while (( $# )); do
-        if [[ "${1:0:1}" == "[" ]]; then
-            expected_args+="$1 "
-            shift
-            continue
-        else
-            # It is expected that actual arguments come after expected-list.
-            break
-        fi
-    done
-    set +x
-
-    # Establish expected argument list.
-    expected_args=($expected_args)
 
     # Parse the actual arguments, comparing them against the expected arguments.
     while (( $# )); do
@@ -152,11 +93,10 @@ _mshmsh_parse_args()
         _mshmsh_set "$lhs" "$rhs"
 
         shift
-
     done
 }
 
-_mshmsh_eval()
+_mshmsh_call()
 {
     local args="$@"
     local result=
@@ -191,17 +131,9 @@ _()
             shift
             _mshmsh_get "$@"
             ;;
-        getd)
-            shift
-            _mshmsh_getd "$@"
-            ;;
         set)
             shift
             _mshmsh_set "$@"
-            ;;
-        setd)
-            shift
-            _mshmsh_setd "$@"
             ;;
         isset)
             shift
@@ -211,11 +143,19 @@ _()
             shift
             _mshmsh_parse_args "$@"
             ;;
-        repl)
+        chr_repl)
             shift
             _mshmsh_chr_replace "$@"
             ;;
+        error)
+            shift
+            _mshmsh_error "$@"
+            ;;
+        call)
+            shift
+            _mshmsh_call "$@"
+            ;;
         *)
-            _mshmsh_eval "$@"
+            _mshmsh_call "$@"
     esac
 }

@@ -172,11 +172,12 @@ _mshmsh_call()
 _mshmsh_error()
 {
     local context="$1"
+    local stackend=$((${#BASH_LINENO[@]}))
     printf 'Error: %s\n\nTraceback (most recent call first):\n' "$context"
-    # Starting from 1 removes _mshmsh_error() from the stack trace.
-    for (( i=0; i < ${#BASH_LINENO[@]}; i++ )); do
+    for (( i=1; i < stackend; i++ )); do
+        # Line i + 1 properly aligns source and line of function caller.
         printf '    File "%s, line %i, in %s()\n' \
-            ${BASH_SOURCE[$i]} ${BASH_LINENO[$i]} ${FUNCNAME[$i]}
+            ${BASH_SOURCE[$i]} ${BASH_LINENO[$i-1]} ${FUNCNAME[$i]}
     done
     exit 1
 }

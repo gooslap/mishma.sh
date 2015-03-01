@@ -77,7 +77,7 @@ _mshmsh_get()
 
         eval "printf '%s\n' \"$statement\"" 
 
-        if (( $? != 0 )); then
+        if (( $? )); then
             _mshmsh_error \
                 "$(printf 'Get variable "%s" failed.' "$__mshmash_var_ref")"
         fi
@@ -95,7 +95,7 @@ _mshmsh_set()
 
     eval "$statement" 
 
-    if (( $? != 0 )); then
+    if (( $? )); then
         _mshmsh_error \
             "$(printf \
                 'Set variable "%s" with statment "%s" failed.'\
@@ -106,7 +106,7 @@ _mshmsh_set()
 _mshmsh_isset()
 {
     local __mshmash_var_ref="$1"
-    eval "[[ -n \${$__mshmash_var_ref+x} ]]"
+    eval "[[ -n \${$__mshmash_var_ref?+x} ]]"
 }
 
 #_mshmsh_extract_expected_args()
@@ -159,16 +159,13 @@ _mshmsh_parse_args()
 _mshmsh_call()
 {
     local args="$@"
-    local result=
 
-    result="$(eval "$args" 2>&1)"
-    if (( $? != 0 )); then
+    eval "$args"
+    if (( $? )); then
         _mshmsh_error \
             "$(printf \
-                'Execution of command "%s" failed. Output:\n\n"%s"'\
-                "$args" "$result")"
-    else
-        printf '%s\n' "$result"
+                'Execution of command "%s" failed.\n'\
+                "$args")"
     fi
 }
 

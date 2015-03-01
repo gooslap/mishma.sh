@@ -132,22 +132,28 @@ _mshmsh_parse_args()
     local lhs=
     local rhs=
 
-    while (( $# )); do
-        lhs="${1%%=*}"
-        rhs="${1##*=}"
-        
-        if [[ "${lhs:0:2}" == "--" ]]; then
-            lhs="${lhs:2:${#lhs}}"
-        else
-            _mshmsh_error "$(printf 'Invalid argument "%s" must have "--" prefix.' "$1")"
-        fi
+    if (( $# )); then
+        while (( $# )); do
+            lhs="${1%%=*}"
+            rhs="${1##*=}"
+            
+            if [[ "${lhs:0:2}" == "--" ]]; then
+                lhs="${lhs:2:${#lhs}}"
+            else
+                _mshmsh_error "$(printf 'Invalid argument "%s" must have "--" prefix.' "$1")"
+            fi
 
-        lhs="$(_mshmsh_chr_replace "$lhs" - _)"
+            lhs="$(_mshmsh_chr_replace "$lhs" - _)"
 
-        _mshmsh_set "$lhs" "$rhs"
+            _mshmsh_set "$lhs" "$rhs"
 
-        shift
-    done
+            shift
+        done
+        return 0
+    else
+        # Let the caller know there were no arguments.
+        return 1
+    fi
 }
 
 _mshmsh_call()

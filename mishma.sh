@@ -106,7 +106,7 @@ _mshmsh_set()
 _mshmsh_isset()
 {
     local __mshmash_var_ref="$1"
-    eval "[[ -n \${$__mshmash_var_ref?+x} ]]"
+    eval "[[ -n \${$__mshmash_var_ref+x} ]]"
 }
 
 #_mshmsh_extract_expected_args()

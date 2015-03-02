@@ -21,6 +21,40 @@
 #SOFTWARE.
 
 
+# Stores the stack trace of the last command that failed.
+readonly _MSHMSH_ERROR_CONTEXT_FILE=/tmp/mishma.sh_error_$$
+
+_mshmsh_error_handler()
+{
+    if [[ -f $_MSHMSH_ERROR_CONTEXT_FILE ]]; then
+        cat $_MSHMSH_ERROR_CONTEXT_FILE 1>&2
+        rm -f $_MSHMSH_ERROR_CONTEXT_FILE
+    else
+        printf 'Failed to load error context file "%s".\n' "$_MSHMSH_ERROR_CONTEXT_FILE"
+    fi
+    exit 1
+}
+
+# This ensures that all subshells will propagate errors to the
+# parent shell whenever _mshmsh_error is invoked.
+trap '_mshmsh_error_handler' SIGABRT
+
+_mshmsh_error()
+{
+    local context="$1"
+    local stackend=$((${#BASH_LINENO[@]}))
+    printf '\nError: %s\n\nTraceback (most recent call first):\n' "$context" \
+        >> $_MSHMSH_ERROR_CONTEXT_FILE
+    for (( i=1; i < stackend; i++ )); do
+        # Line i + 1 properly aligns source and line of function caller.
+        printf '    File "%s, line %i, in %s()\n' \
+            ${BASH_SOURCE[$i]} ${BASH_LINENO[$i-1]} ${FUNCNAME[$i]} \
+            >> $_MSHMSH_ERROR_CONTEXT_FILE
+    done
+    # Allows sub-shells to propagate errors to the parent shell.
+    kill -6 $$
+}
+
 _mshmsh_chr_replace()
 {
     local string="$1"
@@ -109,23 +143,6 @@ _mshmsh_isset()
     eval "[[ -n \${$__mshmash_var_ref+x} ]]"
 }
 
-#_mshmsh_extract_expected_args()
-#{
-#    local expected_args=
-#    
-#    # Grab all of the expected argument entries.
-#    while (( $# )); do
-#        if [[ "${1:0:1}" == "[" ]]; then
-#            expected_args+="$1 "
-#            shift
-#            continue
-#        else
-#            # It is expected that actual arguments come after expected-list.
-#            break
-#        fi
-#    done
-#}
-
 _mshmsh_parse_args()
 {
     local args="$@"
@@ -169,19 +186,6 @@ _mshmsh_call()
     fi
 }
 
-_mshmsh_error()
-{
-    local context="$1"
-    local stackend=$((${#BASH_LINENO[@]}))
-    printf 'Error: %s\n\nTraceback (most recent call first):\n' "$context"
-    for (( i=1; i < stackend; i++ )); do
-        # Line i + 1 properly aligns source and line of function caller.
-        printf '    File "%s, line %i, in %s()\n' \
-            ${BASH_SOURCE[$i]} ${BASH_LINENO[$i-1]} ${FUNCNAME[$i]}
-    done
-    exit 1
-}
-
 _()
 {
     case "$1" in
@@ -222,3 +226,8 @@ _()
             ;;
     esac
 }
+
+
+
+
+

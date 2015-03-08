@@ -21,13 +21,16 @@
 #SOFTWARE.
 
 
+# Set to the PID of the sourcing script.
+readonly _MSHMSH_PARENT_PID=$$
+
 # Stores the stack trace of the last command that failed.
-readonly _MSHMSH_ERROR_CONTEXT_FILE=/tmp/mishma.sh_error_$$
+readonly _MSHMSH_ERROR_CONTEXT_FILE=/tmp/mishma.sh_error_${_MSHMSH_PARENT_PID}
 
 _mshmsh_error_handler()
 {
     if [[ -f $_MSHMSH_ERROR_CONTEXT_FILE ]]; then
-        cat $_MSHMSH_ERROR_CONTEXT_FILE 1>&2
+        while read -r; do printf '%s\n' "$REPLY"; done 1>&2 < $_MSHMSH_ERROR_CONTEXT_FILE
         rm -f $_MSHMSH_ERROR_CONTEXT_FILE
     else
         printf 'Failed to load error context file "%s".\n' "$_MSHMSH_ERROR_CONTEXT_FILE"
@@ -52,7 +55,7 @@ _mshmsh_error()
             >> $_MSHMSH_ERROR_CONTEXT_FILE
     done
     # Allows sub-shells to propagate errors to the parent shell.
-    kill -6 $$
+    kill -s SIGABRT $_MSHMSH_PARENT_PID
 }
 
 _mshmsh_chr_replace()
